@@ -18,23 +18,14 @@ export default function SeatSelectionScreen() {
   // Initialize seats data
   const generateSeats = () => {
     const rows = ["A", "B", "C", "D"];
-    const numbers = Array.from({ length: 9 }, (_, i) => i + 1);
+    const numbers = Array.from({ length: 10 }, (_, i) => i + 1); // Changed to 10 rows
     const seats: Record<string, Seat> = {};
 
     rows.forEach((row) => {
       numbers.forEach((num) => {
         const id = `${row}${num}`;
         // Simulate some taken seats
-        const isTaken = [
-          "A1",
-          "A2",
-          "A3",
-          "A4",
-          "A9",
-          "B1",
-          "B2",
-          "A5",
-        ].includes(id);
+        const isTaken = ["A1", "A2", "A3", "B1", "B2", "A5"].includes(id);
         seats[id] = {
           id,
           status: isTaken ? "taken" : "available",
@@ -130,12 +121,12 @@ export default function SeatSelectionScreen() {
                 <Ionicons
                   name="caret-up-circle-outline"
                   size={50}
-                  color="white"
-                  style={{ marginTop: 20 }}
+                  color="rgba(156, 230, 149, 0.37)"
+                  style={{ marginTop: 10 }}
                 />
               </View>
             </View>
-            {Array.from({ length: 9 }, (_, i) => i + 1).map((number) => (
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((number) => (
               <View key={`left${number}`} className="flex-row gap-2">
                 <TouchableOpacity
                   onPress={() => handleSeatPress(`A${number}`)}
@@ -161,14 +152,14 @@ export default function SeatSelectionScreen() {
           <View className="w-8" />
 
           {/* Right side seats */}
-          <View className="gap-2">
+          <View className="gap-2" style={{ marginTop: -25 }}>
             <View className="flex-row mb-4">
               <View
-                className=" bg-zinc-900"
+                className="bg-zinc-900"
                 style={{ width: "25%", marginTop: 90 }}
               ></View>
             </View>
-            {Array.from({ length: 9 }, (_, i) => i + 1).map((number) => (
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((number) => (
               <View key={`right${number}`} className="flex-row gap-2">
                 <TouchableOpacity
                   onPress={() => handleSeatPress(`C${number}`)}
