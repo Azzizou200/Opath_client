@@ -1,6 +1,6 @@
 import { View, Text, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import TripCard from "../../components/TripCard";
+import TripCard_link from "../../components/TripCard_link";
 
 export default function TicketScreen() {
   const recentTrips = [
@@ -61,7 +61,11 @@ export default function TicketScreen() {
           </View>
           <View className="space-y-4">
             {recentTrips.map((trip, index) => (
-              <TripCard key={`recent-${index}`} {...trip} isBestPrice={false} />
+              <TripCard_link
+                key={`recent-${index}`}
+                {...trip}
+                isBestPrice={false}
+              />
             ))}
           </View>
         </View>
@@ -74,7 +78,11 @@ export default function TicketScreen() {
           </View>
           <View className="space-y-4">
             {savedTrips.map((trip, index) => (
-              <TripCard key={`saved-${index}`} {...trip} isBestPrice={false} />
+              <TripCard_link
+                key={`saved-${index}`}
+                {...trip}
+                isBestPrice={false}
+              />
             ))}
           </View>
         </View>

@@ -6,9 +6,10 @@ import {
   TextInput,
   ScrollView,
   TouchableOpacity,
-  Platform,
   Pressable,
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 import React, { useState } from "react";
 import { StatusBar } from "expo-status-bar";
@@ -19,17 +20,18 @@ import Animated, {
   Easing,
 } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
-import TripCard from "../../components/TripCard";
+import TripCard_link from "../../components/TripCard_link";
 import { router } from "expo-router";
 
 export default function Index() {
   const [tripType, setTripType] = useState<"one-way" | "round-trip">("one-way");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(new Date());
   const [seats, setSeats] = useState("");
   const oneWayOpacity = useSharedValue(1);
   const roundTripOpacity = useSharedValue(0.2);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const animationConfig = {
     duration: 300,
@@ -43,22 +45,41 @@ export default function Index() {
   const roundTripStyle = useAnimatedStyle(() => ({
     opacity: withTiming(roundTripOpacity.value, animationConfig),
   }));
+  const formatDate = (date) => {
+    if (!(date instanceof Date)) return "";
 
-  const handleTripTypeChange = (type: "one-way" | "round-trip") => {
-    setTripType(type);
-    if (type === "one-way") {
-      oneWayOpacity.value = 1;
-      roundTripOpacity.value = 0.2;
-    } else {
-      oneWayOpacity.value = 0.2;
-      roundTripOpacity.value = 1;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`; // This gives format YYYY-MM-DD
+  };
+  const handleDateChange = (event, selectedDate) => {
+    // iOS keeps picker visible
+    if (selectedDate) {
+      setDate(selectedDate);
+      setShowDatePicker(false);
     }
   };
 
   const handleSearch = () => {
+    if (!from || !to || !seats) {
+      alert("Please fill in all fields");
+      return;
+    }
+    if (parseInt(seats) <= 0) {
+      alert("Please enter a valid number of seats");
+      return;
+    }
+
     router.push({
       pathname: "/trips",
-      params: { from, to, date, seats },
+      params: {
+        from: from.trim(),
+        to: to.trim(),
+        date: formatDate(date),
+        seats: seats.trim(),
+      },
     });
   };
 
@@ -68,7 +89,7 @@ export default function Index() {
       <ScrollView className="flex-1">
         {/* Header */}
         <View className="p-4 flex-row justify-between items-center">
-          <Text className="text-xl font-bold">Hi, there 👋</Text>
+          <Text className="text-xl font-bold">Hi, there </Text>
           <TouchableOpacity>
             <Ionicons name="notifications-outline" size={24} color="black" />
           </TouchableOpacity>
@@ -85,10 +106,10 @@ export default function Index() {
 
         {/* Booking Card */}
         <View className="px-4 -mt-40">
-          <View className="bg-white rounded-3xl opacity-90 p-4 shadow-lg">
+          <View className="bg-white rounded-3xl opacity-95 p-4 shadow-lg">
             {/* Trip Type Toggle */}
             <View className="flex-row gap-6 mb-4 px-2">
-              <Pressable onPress={() => handleTripTypeChange("one-way")}>
+              <Pressable>
                 <Animated.Text
                   style={oneWayStyle}
                   className="text-lg font-semibold"
@@ -96,7 +117,7 @@ export default function Index() {
                   One-way
                 </Animated.Text>
               </Pressable>
-              <Pressable onPress={() => handleTripTypeChange("round-trip")}>
+              <Pressable>
                 <Animated.Text
                   style={roundTripStyle}
                   className="text-lg font-semibold"
@@ -135,13 +156,23 @@ export default function Index() {
               {/* Date and Seats */}
               <View className="flex-row gap-4">
                 <View className="flex-1 flex-row items-center border border-gray-200 rounded-xl px-4 py-3">
-                  <TextInput
-                    placeholder="Date"
-                    className="flex-1"
-                    placeholderTextColor="#666"
-                    value={date}
-                    onChangeText={setDate}
-                  />
+                  <Pressable
+                    onPress={() => setShowDatePicker(true)}
+                    className="flex-1 flex-row items-center border border-gray-200 rounded-xl px-4 py-3"
+                  >
+                    <Text className="flex-1 text-gray-800">
+                      {date instanceof Date ? formatDate(date) : "Select date"}
+                    </Text>
+                  </Pressable>
+                  {showDatePicker && (
+                    <DateTimePicker
+                      value={date}
+                      mode="date"
+                      display="default"
+                      onChange={handleDateChange}
+                      minimumDate={new Date()}
+                    />
+                  )}
                   <Ionicons name="calendar" size={20} color="#666" />
                 </View>
                 <View className="flex-1 flex-row items-center border border-gray-200 rounded-xl px-4 py-3">
@@ -171,38 +202,6 @@ export default function Index() {
         </View>
 
         {/* Previous Trips Section */}
-        <View className="px-4 mt-6">
-          <View className="flex-row justify-between items-center mb-4">
-            <Text className="text-lg font-semibold">Previous Trips</Text>
-            <TouchableOpacity>
-              <Text className="text-gray-400">See All</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Trip Cards */}
-          <View className="gap-4">
-            <TripCard
-              id="87541"
-              from="Oran"
-              to="Bechar"
-              fromTime="16:30"
-              toTime="23:00"
-              price="1500.00"
-              duration="6h 30min"
-              isBestPrice={false}
-            />
-            <TripCard
-              id="87542"
-              from="Alger"
-              to="Constantine"
-              fromTime="7:00 am"
-              toTime="2:30 pm"
-              price="1200.00"
-              duration="5h 30min"
-              isBestPrice={false}
-            />
-          </View>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );

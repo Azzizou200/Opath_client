@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,26 +6,152 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { supabase } from "@/lib/supabase";
 
 export default function BookingScreen() {
   const params = useLocalSearchParams();
   const [email, setEmail] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [fullName, setFullName] = useState("");
   const [selectedPayment, setSelectedPayment] = useState("visa");
   const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
+  const [bus_layout, setBus_layout] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [totalPrice, setTotalPrice] = useState(0);
+  const backup = params;
+
+  useEffect(() => {
+    const calculatePrice = async () => {
+      if (params.id && params.seats_initial) {
+        try {
+          const { data: tripData, error } = await supabase
+            .from("trips")
+            .select("price")
+            .eq("id", params.id)
+            .single();
+
+          if (error) throw error;
+          if (!tripData) throw new Error("Trip not found");
+
+          const seatsCount = parseInt(params.seats_initial as string) || 0;
+          const calculatedPrice = tripData.price * seatsCount;
+          setTotalPrice(calculatedPrice);
+        } catch (error) {
+          console.error("Error calculating price:", error);
+          setTotalPrice(0);
+        }
+      }
+    };
+
+    calculatePrice();
+  }, [params.id, params.seats_initial]);
+
+  const fetchBus = async () => {
+    const { data: busData, error: busError } = await supabase
+      .from("buses")
+      .select("*")
+      .eq("id", params.bus_id);
+
+    if (busError) throw busError;
+    setBus_layout(busData[0].layout_type);
+    return console.log("********* bus data", busData[0]);
+  };
 
   const handleSeatSelection = () => {
     router.push({
-      pathname: "/seat-selection",
-      params: { ...params },
+      pathname:
+        bus_layout === "A"
+          ? "/seat-selection"
+          : bus_layout === "B"
+          ? "/seat-selection-8"
+          : "/seat-selection-10",
+      params: {
+        id: params.id,
+        seats_initial: params.seats_initial,
+        bus_id: params.bus_id,
+      },
     });
   };
 
+  const handlePayment = async () => {
+    if (!email || !fullName) {
+      Alert.alert("Error", "Please fill in all required fields");
+      return;
+    }
+
+    if (!params.selectedSeats) {
+      Alert.alert("Error", "Please select your seats first");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      const { data: tripData, error: tripError } = await supabase
+        .from("trips")
+        .select("price")
+        .eq("id", params.id)
+        .single();
+
+      if (tripError) throw tripError;
+      if (!tripData) throw new Error("Trip not found");
+
+      const seatsCount = parseInt(params.seats_initial as string) || 0;
+      const totalPrice = tripData.price * seatsCount;
+
+      const { data, error } = await supabase
+        .from("clientbookings")
+        .insert([
+          {
+            client_name: fullName,
+            email: email,
+            seat_number: params.selectedSeats,
+            payment_status: "pending",
+            trip_id: params.id,
+          },
+        ])
+        .select();
+
+      if (error) throw error;
+
+      const { data: currentTripData, error: fetchError } = await supabase
+        .from("trips")
+        .select("seats_left, total_earnings")
+        .eq("id", params.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (!currentTripData) throw new Error("Trip not found");
+
+      const { error: updateError } = await supabase
+        .from("trips")
+        .update({
+          seats_left: currentTripData.seats_left - seatsCount,
+          total_earnings: (currentTripData.total_earnings || 0) + totalPrice,
+        })
+        .eq("id", params.id);
+
+      if (updateError) throw updateError;
+
+      router.push({
+        pathname: "/final_ticket/qr",
+        params: {
+          booking_id: data[0].id,
+        },
+      });
+    } catch (error) {
+      console.error("Error creating booking:", error);
+      Alert.alert("Error", "Failed to create booking. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  fetchBus();
   return (
     <SafeAreaView className="flex-1 bg-white">
       <View className="flex-row items-center p-4 border-b border-gray-200">
@@ -48,21 +174,21 @@ export default function BookingScreen() {
           <View className="flex-row items-center mb-2">
             <Ionicons name="person-outline" size={24} color="black" />
             <Text className="text-base font-medium ml-2">
-              {selectedSeat
-                ? `Selected seat: ${selectedSeat}`
-                : "Choose a seat please."}
+              {params.selectedSeats
+                ? `Selected seats: ${params.selectedSeats}`
+                : "Choose seats please."}
             </Text>
           </View>
           <Text className="text-sm text-gray-500">
-            {selectedSeat
-              ? "Tap to change your seat"
-              : "You must choose an empty seat for your trip."}
+            {params.selectedSeats
+              ? "Tap to change your seats"
+              : "You must choose empty seats for your trip."}
           </Text>
         </TouchableOpacity>
 
         {/* Personal Information */}
         <View className="bg-[#222222] rounded-xl p-4 mb-6">
-          <Text className="text-white mb-4">Fill your informations please</Text>
+          <Text className="text-white mb-4">Fill your information please</Text>
           <View className="gap-4">
             <TextInput
               placeholder="@gmail.com"
@@ -70,18 +196,13 @@ export default function BookingScreen() {
               onChangeText={setEmail}
               className="bg-gray-800 text-white p-3 rounded-lg"
               placeholderTextColor="#666"
+              keyboardType="email-address"
+              autoCapitalize="none"
             />
             <TextInput
-              placeholder="First Name"
-              value={firstName}
-              onChangeText={setFirstName}
-              className="bg-gray-800 text-white p-3 rounded-lg"
-              placeholderTextColor="#666"
-            />
-            <TextInput
-              placeholder="Last Name"
-              value={lastName}
-              onChangeText={setLastName}
+              placeholder="Full Name"
+              value={fullName}
+              onChangeText={setFullName}
               className="bg-gray-800 text-white p-3 rounded-lg"
               placeholderTextColor="#666"
             />
@@ -162,10 +283,16 @@ export default function BookingScreen() {
         </View>
 
         {/* Pay Button */}
-        <TouchableOpacity className="bg-black flex-row items-center justify-between p-4 rounded-xl mb-6">
-          <Text className="text-white font-semibold">1500.00 DA</Text>
+        <TouchableOpacity
+          className="bg-black flex-row items-center justify-between p-4 rounded-xl mb-6"
+          onPress={handlePayment}
+          disabled={isLoading}
+        >
+          <Text className="text-white font-semibold">{totalPrice} DA</Text>
           <View className="flex-row items-center">
-            <Text className="text-white font-semibold mr-2">Pay</Text>
+            <Text className="text-white font-semibold mr-2">
+              {isLoading ? "Processing..." : "Pay"}
+            </Text>
             <Ionicons name="lock-closed" size={16} color="white" />
           </View>
         </TouchableOpacity>

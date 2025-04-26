@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Pressable, Image } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
@@ -8,76 +8,53 @@ interface TripCardProps {
   to: string;
   fromTime: string;
   toTime: string;
-  price: number;
+  price: string;
   duration: string;
-  date: string;
   isBestPrice?: boolean;
   id?: string;
-  seatsLeft: number;
-  bus_id: string;
-
-  seats_initial: number;
 }
 
-export default function TripCard({
+export default function TripCard_link({
   from,
   to,
   fromTime,
   toTime,
   price,
   duration,
-  date,
   isBestPrice = false,
   id,
-  seatsLeft,
-  bus_id,
-  seats_initial,
 }: TripCardProps) {
   const router = useRouter();
 
   const handlePress = () => {
     router.push({
       pathname: "/booking",
-      params: {
-        from,
-        to,
-        fromTime,
-        toTime,
-        price,
-        duration,
-        date,
-        id,
-        bus_id,
-        seats_initial,
-      },
+      params: { from, to, fromTime, toTime, price, duration, id },
     });
-    console.log("*********", bus_id);
   };
 
   return (
-    <Pressable onPress={handlePress}>
+    <Pressable>
       <View className="bg-black rounded-2xl p-4 w-full mb-4">
         {/* Price Header */}
         <View className="flex-row justify-between items-center mb-4">
           <View className="flex-row items-center space-x-2">
-            <Image source={require("../assets/images/logo.svg")} />
+            <Ionicons name="bus-outline" size={20} color="white" />
             <Text className="text-white font-bold text-lg">Opath</Text>
           </View>
-          <Text className="text-[#4CAF50] font-bold text-2xl">
-            {price.toString()} DA
-          </Text>
+          <Text className="text-gray-400 font-bold text-2xl">{price} DA</Text>
         </View>
 
         {/* Locations */}
         <View className="flex-row justify-between items-center mb-3">
-          <Text className="text-white text-lg font-bold">{from}</Text>
-          <Text className="text-white  text-lg font-bold">{to}</Text>
+          <Text className="text-white font-semibold">{from}</Text>
+          <Text className="text-white font-semibold">{to}</Text>
         </View>
 
         {/* Trip Times */}
         <View className="flex-row justify-between items-center mb-4">
           <View>
-            <Text className="text-gray-400 text-sm mb-1 ">From</Text>
+            <Text className="text-gray-400 text-sm mb-1">From</Text>
             <Text className="text-white text-xl font-bold">{fromTime}</Text>
           </View>
 
@@ -97,40 +74,13 @@ export default function TripCard({
         </View>
 
         {/* Duration and Best Price */}
-        <View
-          className="flex-row justify-between items-center"
-          style={{ marginTop: 10 }}
-        >
-          <View className="flex-1">
-            <View className="flex-row items-center">
-              <Ionicons name="time-outline" size={16} color="#666" />
-              <Text className="text-gray-400 text-sm ml-1">
-                Duration: {duration}
-              </Text>
-            </View>
-            <View className="flex-row items-center">
-              <Ionicons name="people" size={16} color="#666" />
-              <Text className="text-gray-400 text-sm ml-1">
-                seats left: {seatsLeft}
-              </Text>
-            </View>
-          </View>
-
+        <View className="flex-row justify-between items-center">
           <View className="flex-row items-center">
-            <Ionicons
-              name="calendar"
-              size={16}
-              color="#666"
-              style={{ marginTop: 15 }}
-            />
-            <Text
-              className="text-gray-400 text-sm ml-1"
-              style={{ marginTop: 15 }}
-            >
-              Date: {date}
+            <Ionicons name="time-outline" size={16} color="#666" />
+            <Text className="text-gray-400 text-sm ml-1">
+              Duration: {duration}
             </Text>
           </View>
-
           {isBestPrice && (
             <Text className="text-[#4CAF50] font-semibold">
               "Best <Text className="text-[#4CAF50]">Price</Text>"

@@ -1,8 +1,15 @@
-import React, { useState } from "react";
-import { View, Text, TouchableOpacity, ScrollView } from "react-native";
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { supabase } from "@/lib/supabase";
 
 type SeatStatus = "available" | "taken" | "selected";
 
@@ -13,64 +20,87 @@ interface Seat {
 
 export default function SeatSelectionScreen() {
   const params = useLocalSearchParams();
-  const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
+  const seatsToSelect = parseInt(params.seats_initial as string) || 1;
+  const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
+  const [seats, setSeats] = useState<Record<string, Seat>>({});
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize seats data
-  const generateSeats = () => {
-    const rows = ["A", "B", "C", "D"];
-    const numbers = Array.from({ length: 9 }, (_, i) => i + 1);
-    const seats: Record<string, Seat> = {};
+  // Fetch taken seats from the database
+  useEffect(() => {
+    const fetchTakenSeats = async () => {
+      try {
+        // Get all bookings for this trip
+        const { data: bookings, error: bookingsError } = await supabase
+          .from("clientbookings")
+          .select("seat_number")
+          .eq("trip_id", params.id);
 
-    rows.forEach((row) => {
-      numbers.forEach((num) => {
-        const id = `${row}${num}`;
-        // Simulate some taken seats
-        const isTaken = [
-          "A1",
-          "A2",
-          "A3",
-          "A4",
-          "A9",
-          "B1",
-          "B2",
-          "A5",
-        ].includes(id);
-        seats[id] = {
-          id,
-          status: isTaken ? "taken" : "available",
-        };
-      });
-    });
+        if (bookingsError) throw bookingsError;
 
-    return seats;
-  };
+        // Initialize seats
+        const rows = ["A", "B", "C", "D"];
+        const numbers = Array.from({ length: 9 }, (_, i) => i + 1);
+        const initialSeats: Record<string, Seat> = {};
 
-  const [seats, setSeats] = useState(generateSeats());
+        // First, mark all seats as available
+        rows.forEach((row) => {
+          numbers.forEach((num) => {
+            const id = `${row}${num}`;
+            initialSeats[id] = {
+              id,
+              status: "available",
+            };
+          });
+        });
+
+        // Then mark booked seats as taken
+        bookings?.forEach((booking) => {
+          const bookedSeats = booking.seat_number.split(",");
+          bookedSeats.forEach((seatId: string) => {
+            if (initialSeats[seatId.trim()]) {
+              initialSeats[seatId.trim()].status = "taken";
+            }
+          });
+        });
+
+        setSeats(initialSeats);
+      } catch (error) {
+        console.error("Error fetching taken seats:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTakenSeats();
+  }, [params.id]);
 
   const handleSeatPress = (seatId: string) => {
     if (seats[seatId].status === "taken") return;
 
     setSeats((prev) => {
       const newSeats = { ...prev };
-      // Reset previously selected seat
-      if (selectedSeat) {
-        newSeats[selectedSeat].status = "available";
+
+      if (newSeats[seatId].status === "selected") {
+        // Deselect the seat
+        newSeats[seatId].status = "available";
+        setSelectedSeats(selectedSeats.filter((id) => id !== seatId));
+      } else if (selectedSeats.length < seatsToSelect) {
+        // Select the seat if we haven't reached the limit
+        newSeats[seatId].status = "selected";
+        setSelectedSeats([...selectedSeats, seatId]);
       }
-      // Set new selected seat
-      newSeats[seatId].status =
-        newSeats[seatId].status === "selected" ? "available" : "selected";
+
       return newSeats;
     });
-    setSelectedSeat(seatId);
   };
 
   const handleConfirm = () => {
-    if (selectedSeat) {
+    if (selectedSeats.length === seatsToSelect) {
       router.push({
         pathname: "/booking",
         params: {
           ...params,
-          selectedSeat,
+          selectedSeats: selectedSeats.join(","),
         },
       });
     }
@@ -87,6 +117,15 @@ export default function SeatSelectionScreen() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <SafeAreaView className="flex-1 bg-black justify-center items-center">
+        <ActivityIndicator size="large" color="white" />
+        <Text className="text-white mt-4">Loading seats...</Text>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-black">
       <View className="flex-row items-center p-4 border-b border-gray-800">
@@ -99,7 +138,12 @@ export default function SeatSelectionScreen() {
           />
         </TouchableOpacity>
         <View className="flex-1 items-center">
-          <Text className="text-lg font-semibold text-white">Take a seat!</Text>
+          <Text className="text-lg font-semibold text-white">
+            Select {seatsToSelect} seat{seatsToSelect > 1 ? "s" : ""}
+          </Text>
+          <Text className="text-sm text-gray-400">
+            {selectedSeats.length} of {seatsToSelect} selected
+          </Text>
         </View>
         <View style={{ width: 24 }} />
       </View>
@@ -140,7 +184,7 @@ export default function SeatSelectionScreen() {
                 <TouchableOpacity
                   onPress={() => handleSeatPress(`A${number}`)}
                   className={`w-12 h-12 rounded-lg justify-center items-center ${getSeatColor(
-                    seats[`A${number}`].status
+                    seats[`A${number}`]?.status || "available"
                   )}`}
                 >
                   <Text className="font-bold text-white">A{number}</Text>
@@ -148,7 +192,7 @@ export default function SeatSelectionScreen() {
                 <TouchableOpacity
                   onPress={() => handleSeatPress(`B${number}`)}
                   className={`w-12 h-12 rounded-lg justify-center items-center ${getSeatColor(
-                    seats[`B${number}`].status
+                    seats[`B${number}`]?.status || "available"
                   )}`}
                 >
                   <Text className="font-bold text-white">B{number}</Text>
@@ -173,7 +217,7 @@ export default function SeatSelectionScreen() {
                 <TouchableOpacity
                   onPress={() => handleSeatPress(`C${number}`)}
                   className={`w-12 h-12 rounded-lg justify-center items-center ${getSeatColor(
-                    seats[`C${number}`].status
+                    seats[`C${number}`]?.status || "available"
                   )}`}
                 >
                   <Text className="font-bold text-white">C{number}</Text>
@@ -181,7 +225,7 @@ export default function SeatSelectionScreen() {
                 <TouchableOpacity
                   onPress={() => handleSeatPress(`D${number}`)}
                   className={`w-12 h-12 rounded-lg justify-center items-center ${getSeatColor(
-                    seats[`D${number}`].status
+                    seats[`D${number}`]?.status || "available"
                   )}`}
                 >
                   <Text className="font-bold text-white">D{number}</Text>
@@ -196,12 +240,20 @@ export default function SeatSelectionScreen() {
       <View className="p-4">
         <TouchableOpacity
           onPress={handleConfirm}
-          disabled={!selectedSeat}
+          disabled={selectedSeats.length !== seatsToSelect}
           className={`p-4 rounded-xl ${
-            selectedSeat ? "bg-green-500" : "bg-gray-500"
+            selectedSeats.length === seatsToSelect
+              ? "bg-green-500"
+              : "bg-gray-500"
           }`}
         >
-          <Text className="text-white text-center font-semibold">Confirm</Text>
+          <Text className="text-white text-center font-semibold">
+            {selectedSeats.length === seatsToSelect
+              ? "Confirm Selection"
+              : `Select ${seatsToSelect - selectedSeats.length} more seat${
+                  seatsToSelect - selectedSeats.length > 1 ? "s" : ""
+                }`}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
