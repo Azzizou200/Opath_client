@@ -3,7 +3,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import TripCard from "../../components/TripCard";
 import { useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../../lib/supabase";
 
 // Define Trip interface to fix TypeScript errors
@@ -22,16 +23,59 @@ interface Trip {
 }
 
 export default function TripsScreen() {
-  const { from, to, date, seats } = useLocalSearchParams();
+  // Get the search params
+  const params = useLocalSearchParams();
+  // Create state variables that will update when params change
+  const [searchParams, setSearchParams] = useState({
+    from: params.from as string,
+    to: params.to as string,
+    date: params.date as string,
+    seats: params.seats as string
+  });
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [routeIds, setRouteIds] = useState<string[]>([]);
   const [shouldRefresh, setShouldRefresh] = useState(false);
 
+  // Update searchParams when params change
   useEffect(() => {
+    const newParams = {
+      from: params.from as string,
+      to: params.to as string,
+      date: params.date as string,
+      seats: params.seats as string
+    };
+    
+    // Only update if the params have actually changed
+    if (JSON.stringify(newParams) !== JSON.stringify(searchParams)) {
+      console.log("Params changed, updating search parameters:", newParams);
+      setSearchParams(newParams);
+    }
+  }, [params]);
+
+  // Fetch trips whenever searchParams change
+  useEffect(() => {
+    console.log("Search parameters updated, fetching trips");
     fetchTrips();
-  }, []); // Only run once on mount
+  }, [searchParams]);
+
+  useFocusEffect(
+    useCallback(() => {
+      console.log("Screen focused");
+      // Check if params have changed since last focus
+      const newParams = {
+        from: params.from as string,
+        to: params.to as string,
+        date: params.date as string,
+        seats: params.seats as string
+      };
+      
+      if (JSON.stringify(newParams) !== JSON.stringify(searchParams)) {
+        setSearchParams(newParams);
+      }
+    }, [params, searchParams])
+  );
 
   useEffect(() => {
     if (!routeIds.length) return; // Don't subscribe if no routes
@@ -72,15 +116,16 @@ export default function TripsScreen() {
     try {
       setLoading(true);
       setError(null);
-
+      console.log("from", `%${searchParams.from}%`);
+      console.log("to", `%${searchParams.to}%`);
       const { data: routeData, error: routeError } = await supabase
         .from("routes")
         .select("id")
-        .ilike("start_location", `%${from}%`)
-        .ilike("destination", `%${to}%`);
+        .ilike("start_location", `%${searchParams.from}%`)
+        .ilike("destination", `%${searchParams.to}%`);
 
       if (routeError) throw routeError;
-
+      console.log("routeData", routeData);
       if (!routeData?.length) {
         setTrips([]);
         setError("No routes found for these locations");
@@ -106,14 +151,14 @@ export default function TripsScreen() {
         `
         )
         .in("route_id", newRouteIds)
-        .gte("seats_left", parseInt(seats as string) || 1);
+        .gte("seats_left", parseInt(searchParams.seats as string) || 1);
 
       if (tripError) throw tripError;
 
       let filteredTripData = tripData;
-      if (date) {
+      if (searchParams.date) {
         filteredTripData = tripData.filter(
-          (trip) => new Date(trip.date) >= new Date(date as string)
+          (trip) => new Date(trip.date) >= new Date(searchParams.date as string)
         );
       }
 
@@ -128,7 +173,7 @@ export default function TripsScreen() {
         date: trip.date,
         seatsLeft: trip.seats_left,
         bus_id: trip.bus_id,
-        seats_initial: parseInt(seats as string),
+        seats_initial: parseInt(searchParams.seats as string),
       }));
 
       setTrips(transformedTrips);
@@ -143,7 +188,7 @@ export default function TripsScreen() {
       setLoading(false);
     }
   };
-  console.log("/////////////", seats);
+
   return (
     <SafeAreaView className="flex-1 bg-white">
       <ScrollView className="flex-1">
@@ -153,19 +198,19 @@ export default function TripsScreen() {
             <View className="flex-row items-center mb-2">
               <Ionicons name="location" size={20} color="#000" />
               <Text className="text-base ml-2">
-                From <Text className="font-bold">{from}</Text> to{" "}
-                <Text className="font-bold">{to}</Text>
+                From <Text className="font-bold">{searchParams.from}</Text> to{" "}
+                <Text className="font-bold">{searchParams.to}</Text>
               </Text>
             </View>
             <View className="flex-row justify-between">
               <View className="flex-row items-center">
                 <Ionicons name="calendar" size={16} color="#666" />
-                <Text className="text-sm text-gray-600 ml-1">{date}</Text>
+                <Text className="text-sm text-gray-600 ml-1">{searchParams.date}</Text>
               </View>
               <View className="flex-row items-center">
                 <Ionicons name="people" size={16} color="#666" />
                 <Text className="text-sm text-gray-600 ml-1">
-                  {seats} seat(s)
+                  {searchParams.seats} seat(s)
                 </Text>
               </View>
             </View>
@@ -200,7 +245,7 @@ export default function TripsScreen() {
                   date={trip.date}
                   seatsLeft={trip.seatsLeft}
                   bus_id={trip.bus_id}
-                  seats_initial={parseInt(seats as string)}
+                  seats_initial={parseInt(searchParams.seats as string)}
                 />
               ))
             ) : (

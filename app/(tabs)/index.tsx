@@ -45,7 +45,7 @@ export default function Index() {
   const roundTripStyle = useAnimatedStyle(() => ({
     opacity: withTiming(roundTripOpacity.value, animationConfig),
   }));
-  const formatDate = (date) => {
+  const formatDate = (date: Date) => {
     if (!(date instanceof Date)) return "";
 
     const year = date.getFullYear();
@@ -54,7 +54,7 @@ export default function Index() {
 
     return `${year}-${month}-${day}`; // This gives format YYYY-MM-DD
   };
-  const handleDateChange = (event, selectedDate) => {
+  const handleDateChange = (event: any, selectedDate: Date) => {
     // iOS keeps picker visible
     if (selectedDate) {
       setDate(selectedDate);
@@ -71,7 +71,10 @@ export default function Index() {
       alert("Please enter a valid number of seats");
       return;
     }
-
+    console.log("from", from);
+    console.log("to", to);
+    console.log("date", formatDate(date));
+    console.log("seats", seats);
     router.push({
       pathname: "/trips",
       params: {
@@ -90,9 +93,7 @@ export default function Index() {
         {/* Header */}
         <View className="p-4 flex-row justify-between items-center">
           <Text className="text-xl font-bold">Hi, there </Text>
-          <TouchableOpacity>
-            <Ionicons name="notifications-outline" size={24} color="black" />
-          </TouchableOpacity>
+         
         </View>
 
         {/* Map Background */}
@@ -169,7 +170,12 @@ export default function Index() {
                       value={date}
                       mode="date"
                       display="default"
-                      onChange={handleDateChange}
+                      onChange={(event, selectedDate) => {
+                        if (selectedDate) {
+                          setDate(selectedDate);
+                          setShowDatePicker(false);
+                        }
+                      }}
                       minimumDate={new Date()}
                     />
                   )}
